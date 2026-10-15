@@ -1,0 +1,32 @@
+{
+  "statusCode": 200,
+  "headers": { "resultCode": "S100", "resultMessage": "" },
+  "body": {
+    "deviceId": "0A1B2C3D4E60_pk3rt8v1c6",
+    "totalCnt": 1,
+    "data": [
+      {
+        "apiNo": "A210",
+        "apiGroup": "001",
+        "deviceGroup": "Air01",
+        "modelId": "C545",
+        "attributes": {
+          "A02": "0",
+          "A03": "01",
+          "A04": "01",
+          "A05": "01",
+          "A07": "0",
+          "A21": "1257",
+          "S07": "01",
+          "S04": "12",
+          "S08": "74",
+          "S14": "121"
+        },
+        "rssi": "-55",
+        "creationTime": 1673449200634,
+        "utcDatetime": "2023-01-11 15:00:00",
+        "utcTimestamp": 1673449200
+      }
+    ]
+  }
+}

@@ -1,77 +1,172 @@
+// -----------------------------------------------------------------------------
+// The purifier widget: a content the core renders as sent (budget, texts),
+// tiles bound to features the device really has, buttons that drive the
+// purifier, the current mode marked by its icon.
+// -----------------------------------------------------------------------------
+
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { validateWidgetContent } from '@gladysassistant/integration-sdk';
-import { createFakeGladys } from '@gladysassistant/integration-sdk/testing';
-import { buildDiscoveredDevices } from '../src/devices/index.js';
-import { simulateLanSession } from '../src/devices/plug.js';
-import { DEMO_STATUS_WIDGET, WIDGETS, refreshWidgets } from '../src/widgets.js';
-import { normalizeConfig } from '../src/config.js';
+import { createWorld } from './helpers/world.js';
+import { buildWidgetContent } from '../src/app.js';
+import { TEXT } from '../src/i18n.js';
 
-const gladys = createFakeGladys();
-const config = normalizeConfig();
-const demoStatus = WIDGETS[DEMO_STATUS_WIDGET];
+const LIVING_ID = '0A1B2C3D4E5F_zq7wk2m4x9';
 
-// What the SDK passes to onWidgetGet, plus the config index.js adds.
-const getContent = (cfg = config) =>
-  demoStatus.get(gladys, { settings: {}, language: 'en', units: 'metric', config: cfg });
+async function widget(world, device, language = 'fr') {
+  const answer = await world.gladys.fake.widgetGet('purifier', {
+    settings: { device: device?.external_id },
+    language,
+    units: 'metric',
+  });
+  assert.equal(answer.success, true, answer.error);
+  return answer.data.content;
+}
 
-test('the demo_status content is rendered exactly as sent', async () => {
-  // [] = nothing the core would drop, truncate or trim to the content budget.
-  assert.deepEqual(validateWidgetContent(await getContent()), []);
-});
+function featureIds(device) {
+  return new Set(device.features.map((f) => f.external_id));
+}
 
-test('the degraded plug connection content is valid too', async () => {
-  simulateLanSession(false);
-  try {
-    const content = await getContent();
-    assert.deepEqual(validateWidgetContent(content), []);
-    const status = content.components.find((component) => component.type === 'status');
-    assert.ok(
-      status.items.some((item) => item.color === 'warning'),
-      'degraded shows a warning',
-    );
-  } finally {
-    simulateLanSession(true);
+test('the content fits the core budget, in every language, and binds existing features', async (t) => {
+  const world = await createWorld();
+  t.after(() => world.app.stop());
+  await world.addAll();
+  for (const device of world.gladys.fake.discoveredDevices) {
+    for (const language of ['en', 'fr', 'de', 'es']) {
+      const content = await widget(world, device, language);
+      assert.deepEqual(validateWidgetContent(content), [], JSON.stringify(content));
+      for (const component of content.components) {
+        if (component.device_feature) {
+          assert.ok(featureIds(device).has(component.device_feature), component.device_feature);
+        }
+      }
+    }
   }
-});
-
-test('the live tiles reference features the integration publishes', async () => {
-  const featureIds = new Set(
-    buildDiscoveredDevices(gladys, config).flatMap((device) =>
-      device.features.map((feature) => feature.external_id),
-    ),
+  const bedroom = await widget(world, world.discovered('Bedroom'));
+  assert.deepEqual(
+    bedroom.components.map((c) => c.type),
+    ['text', 'value', 'gauge', 'status', 'button'],
   );
-  const liveTiles = (await getContent()).components.filter((c) => c.device_feature);
-  assert.ok(liveTiles.length > 0, 'the template demonstrates a device-bound tile');
-  for (const tile of liveTiles) {
-    assert.ok(featureIds.has(tile.device_feature), `unknown feature ${tile.device_feature}`);
-  }
-});
-
-test('every button action of the content is handled and answers a short toast', async () => {
-  const buttons = (await getContent()).components.filter((c) => c.type === 'button' && c.action);
-  assert.ok(buttons.length > 0, 'the template demonstrates a widget action');
-  for (const { action } of buttons) {
-    const message = await demoStatus.action(gladys, {
-      actionKey: action.key,
-      params: action.params ?? {},
-      settings: {},
-      config,
-    });
-    assert.ok(message.en, 'the toast carries at least the mandatory `en` text');
-    assert.ok(message.en.length <= 200, 'toasts are capped at 200 characters');
-  }
-});
-
-test('an unknown widget action fails, so the user sees the error', async () => {
-  await assert.rejects(
-    demoStatus.action(gladys, { actionKey: 'unknown', params: {}, settings: {}, config }),
-    /Unknown widget action/,
+  assert.deepEqual(
+    bedroom.components.find((c) => c.type === 'status').items.map((i) => [i.label, i.value]),
+    [
+      ['État', 'Éteint'],
+      ['Air', 'Bonne'],
+      ['Filtre', '85 % · 7383 h'],
+    ],
   );
+
+  // Running, with every tile and button: the eight components the core allows.
+  const device = world.discovered('Bedroom');
+  await world.gladys.fake.widgetAction(
+    'purifier',
+    'power_on',
+    {},
+    {
+      settings: { device: device.external_id },
+    },
+  );
+  const running = await widget(world, device);
+  assert.equal(running.components.length, 8);
+  assert.deepEqual(validateWidgetContent(running), []);
 });
 
-test('refreshWidgets nudges every widget', () => {
-  const fresh = createFakeGladys();
-  refreshWidgets(fresh);
-  assert.deepEqual(fresh.fake.widgetRefreshes, Object.keys(WIDGETS));
+test('an idle purifier offers to turn it on; a running one, its modes and Off', async (t) => {
+  const world = await createWorld();
+  t.after(() => world.app.stop());
+  await world.addAll();
+  const living = world.discovered('Living');
+  const buttons = (content) =>
+    content.components.filter((c) => c.type === 'button').map((c) => [c.action.key, c.icon]);
+
+  // The fixture purifier is off: one button.
+  assert.deepEqual(buttons(await widget(world, living)), [['power_on', 'power']]);
+
+  const on = await world.gladys.fake.widgetAction(
+    'purifier',
+    'power_on',
+    {},
+    {
+      settings: { device: living.external_id },
+    },
+  );
+  assert.deepEqual(on, { success: true, data: { message: TEXT.done } });
+  assert.deepEqual(buttons(await widget(world, living)), [
+    ['mode_auto', 'check-circle'],
+    ['mode_manual', 'sliders'],
+    ['mode_sleep', 'moon'],
+    ['power_off', 'power'],
+  ]);
+
+  await world.gladys.fake.widgetAction(
+    'purifier',
+    'mode_sleep',
+    {},
+    {
+      settings: { device: living.external_id },
+    },
+  );
+  assert.equal(world.winix.attributes.get(LIVING_ID).A04, '06');
+  const content = await widget(world, living);
+  assert.deepEqual(
+    buttons(content).find(([key]) => key === 'mode_sleep'),
+    ['mode_sleep', 'check-circle'],
+  );
+  assert.equal(content.components.find((c) => c.type === 'status').items[0].value, 'Sommeil');
+});
+
+test('an unknown action, an offline purifier, no purifier chosen', async (t) => {
+  const world = await createWorld();
+  t.after(() => world.app.stop());
+  await world.addAll();
+  const living = world.discovered('Living');
+
+  const unknown = await world.gladys.fake.widgetAction(
+    'purifier',
+    'self_destruct',
+    {},
+    {
+      settings: { device: living.external_id },
+    },
+  );
+  assert.equal(unknown.success, false);
+
+  const none = await widget(world, undefined, 'de');
+  assert.deepEqual(none.components, [
+    { type: 'text', variant: 'caption', text: TEXT.pickPurifier.de },
+  ]);
+
+  world.winix.state.offline.add(LIVING_ID);
+  await world.gladys.fake.configUpdated({
+    ...world.app.config,
+    password: world.app.config.password,
+  });
+  const offline = await widget(world, living, 'en');
+  assert.deepEqual(validateWidgetContent(offline), []);
+  assert.deepEqual(offline.components.at(-1).items, [
+    { label: 'State', value: 'Offline', color: 'danger' },
+  ]);
+  const press = await world.gladys.fake.widgetAction(
+    'purifier',
+    'power_on',
+    {},
+    {
+      settings: { device: living.external_id },
+    },
+  );
+  assert.equal(press.success, false);
+});
+
+test('a purifier never read yet says so instead of empty rows', () => {
+  const content = buildWidgetContent({
+    lang: 'es',
+    ids: { feature: (key) => `x:${key}` },
+    features: new Set(['power', 'mode']),
+    attributes: null,
+    online: undefined,
+    lifeHours: 6480,
+    name: 'Salón',
+  });
+  assert.deepEqual(validateWidgetContent(content), []);
+  assert.equal(content.components.at(-1).text, TEXT.noValueYet.es);
 });

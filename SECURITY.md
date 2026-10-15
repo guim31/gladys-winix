@@ -28,8 +28,23 @@ Gladys before reporting a problem.
 
 ## Scope
 
-In scope: the code of this repository and the Docker image it publishes.
+In scope: the code of this repository and the Docker image it publishes —
+in particular how it handles the Winix account:
+
+- the e-mail address and password stay in the Gladys configuration; the
+  password is only used for the SRP sign-in to Winix's AWS Cognito, never
+  sent in clear nor written to disk;
+- `/data/winix-session.json` (readable by the container user only) keeps the
+  Cognito refresh token, the Cognito identity id of the account (which,
+  with a device id, is enough to control a purifier through the Winix cloud),
+  the list of the purifiers and a SHA-256 of the e-mail address — no
+  password, no access token;
+- no token, password, e-mail address or identity id may reach the logs;
+- the container only talks to `cognito-idp.us-east-1.amazonaws.com`,
+  `cognito-identity.us-east-1.amazonaws.com`, `us.mobile.winix-iot.com` and
+  `us.api.winix-iot.com`, over HTTPS.
 
 Out of scope: Gladys Assistant itself (see its
 [security policy](https://github.com/GladysAssistant/Gladys/security/policy)),
-and the third-party services and devices the integration talks to.
+and the Winix cloud and purifiers the integration talks to (report those to
+Winix).

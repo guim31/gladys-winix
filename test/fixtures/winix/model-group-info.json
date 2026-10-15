@@ -1,0 +1,13 @@
+{
+  "resultCode": "200",
+  "resultMessage": "",
+  "modelGroupInfoList": [
+    {
+      "modelInfoList": [
+        { "modelId": "c545", "filterInfoList": [{ "filterMaxLife": 6480 }] },
+        { "modelId": "T810_EU", "filterInfoList": [{ "filterMaxLife": 8640 }] }
+      ]
+    },
+    { "modelInfoList": [{ "modelId": "a401", "filterInfoList": [] }] }
+  ]
+}

@@ -1,177 +1,165 @@
 {
   "manifest_version": 1,
   "type": "device",
-  "name": "Demo Devices Template",
+  "name": "Winix",
   "description": {
-    "en": "Starter template showing sensors, a switch, a dimmable light and a smart plug.",
-    "fr": "Template de démarrage : capteurs, interrupteur, lampe variable et prise connectée."
+    "en": "Winix connected air purifiers: power, mode, fan speed, Plasmawave, air quality and filter life.",
+    "fr": "Purificateurs d'air Winix : marche, mode, vitesse, Plasmawave, qualité de l'air et filtre.",
+    "de": "Winix-Luftreiniger: Betrieb, Modus, Lüfterstufe, Plasmawave, Luftqualität und Filter.",
+    "es": "Purificadores de aire Winix: encendido, modo, velocidad, Plasmawave, calidad del aire y filtro."
   },
   "version": "1.0.0",
-  "docker_image": "ghcr.io/gladysassistant/integration-template-js:1.0.0",
+  "docker_image": "ghcr.io/guim31/gladys-winix:1.0.0",
   "gladys_version": ">=5.1.0",
-  "cover_image": "https://raw.githubusercontent.com/GladysAssistant/integration-template-js/master/cover.png",
-  "categories": ["lighting", "security", "environment"],
-  "transports": ["local", "cloud"],
+  "cover_image": "https://raw.githubusercontent.com/guim31/gladys-winix/main/cover.png",
+  "categories": ["environment", "appliances"],
+  "transports": ["cloud"],
   "config_schema": [
     {
       "key": "intro",
       "type": "section",
-      "label": { "en": "Getting started", "fr": "Pour commencer" },
-      "description": {
-        "en": "The demo weather station reads real data from the free Open-Meteo API: pick the coordinates to observe. No account, no API key.",
-        "fr": "La station météo de démonstration lit de vraies données via l'API gratuite Open-Meteo : choisissez les coordonnées à observer. Pas de compte, pas de clé d'API."
+      "label": {
+        "en": "Your Winix account",
+        "fr": "Votre compte Winix",
+        "de": "Dein Winix-Konto",
+        "es": "Su cuenta Winix"
       },
-      "links": [
-        {
-          "url": "https://open-meteo.com/en/docs",
-          "label": { "en": "Open-Meteo documentation", "fr": "Documentation Open-Meteo" }
-        }
-      ]
+      "description": {
+        "en": "The account of the Winix Smart app, where your purifiers are already set up. Signing in here may log the phone app out once: sign in again on the phone, the integration keeps working.",
+        "fr": "Le compte de l'appli Winix Smart, où vos purificateurs sont déjà installés. La connexion ici peut déconnecter l'appli du téléphone une fois : reconnectez-la, l'intégration continue de fonctionner.",
+        "de": "Das Konto der Winix-Smart-App, in der deine Luftreiniger schon eingerichtet sind. Die Anmeldung hier kann die App auf dem Handy einmal abmelden: Melde dich dort neu an, die Integration läuft weiter.",
+        "es": "La cuenta de la aplicación Winix Smart, donde sus purificadores ya están instalados. Iniciar sesión aquí puede cerrar una vez la sesión de la aplicación del móvil: vuelva a entrar, la integración sigue funcionando."
+      }
     },
     {
-      "key": "latitude",
-      "type": "number",
-      "label": { "en": "Latitude", "fr": "Latitude" },
-      "description": {
-        "en": "Latitude used for the demo weather sensor.",
-        "fr": "Latitude utilisée par le capteur météo de démonstration."
+      "key": "username",
+      "type": "string",
+      "label": {
+        "en": "E-mail address",
+        "fr": "Adresse e-mail",
+        "de": "E-Mail-Adresse",
+        "es": "Correo electrónico"
       },
-      "placeholder": { "en": "e.g. 48.8566", "fr": "ex. 48.8566" },
+      "description": {
+        "en": "The e-mail address you sign in to the Winix Smart app with.",
+        "fr": "L'adresse e-mail avec laquelle vous vous connectez à l'appli Winix Smart.",
+        "de": "Die E-Mail-Adresse, mit der du dich in der Winix-Smart-App anmeldest.",
+        "es": "La dirección de correo con la que inicia sesión en la aplicación Winix Smart."
+      },
+      "placeholder": {
+        "en": "e.g. name@example.com",
+        "fr": "ex. nom@example.com",
+        "de": "z. B. name@example.com",
+        "es": "p. ej. nombre@example.com"
+      },
       "required": true,
-      "default": 48.8566,
-      "min": -90,
-      "max": 90
+      "default": ""
     },
     {
-      "key": "longitude",
-      "type": "number",
-      "label": { "en": "Longitude", "fr": "Longitude" },
-      "description": {
-        "en": "Longitude used for the demo weather sensor.",
-        "fr": "Longitude utilisée par le capteur météo de démonstration."
+      "key": "password",
+      "type": "secret",
+      "label": {
+        "en": "Password",
+        "fr": "Mot de passe",
+        "de": "Passwort",
+        "es": "Contraseña"
       },
-      "placeholder": { "en": "e.g. 2.3522", "fr": "ex. 2.3522" },
-      "required": true,
-      "default": 2.3522,
-      "min": -180,
-      "max": 180
+      "description": {
+        "en": "The password of the Winix account. It stays in Gladys and is only sent to the Winix sign-in service.",
+        "fr": "Le mot de passe du compte Winix. Il reste dans Gladys et n'est envoyé qu'au service de connexion de Winix.",
+        "de": "Das Passwort des Winix-Kontos. Es bleibt in Gladys und geht nur an den Anmeldedienst von Winix.",
+        "es": "La contraseña de la cuenta Winix. Se queda en Gladys y solo se envía al servicio de inicio de sesión de Winix."
+      },
+      "required": true
     },
     {
-      "key": "unit",
+      "key": "refresh_interval",
+      "type": "number",
+      "label": {
+        "en": "Refresh interval (minutes)",
+        "fr": "Intervalle de rafraîchissement (minutes)",
+        "de": "Aktualisierungsintervall (Minuten)",
+        "es": "Intervalo de actualización (minutos)"
+      },
+      "description": {
+        "en": "How often each purifier is read from the Winix cloud, from 1 to 5 minutes.",
+        "fr": "Fréquence de lecture de chaque purificateur sur le cloud Winix, de 1 à 5 minutes.",
+        "de": "Wie oft jeder Luftreiniger aus der Winix-Cloud gelesen wird, 1 bis 5 Minuten.",
+        "es": "Frecuencia de lectura de cada purificador en la nube de Winix, de 1 a 5 minutos."
+      },
+      "required": false,
+      "default": 2,
+      "min": 1,
+      "max": 5
+    },
+    {
+      "key": "language",
       "type": "select",
-      "label": { "en": "Temperature unit", "fr": "Unité de température" },
+      "label": {
+        "en": "Language of the feature names",
+        "fr": "Langue des noms de fonctionnalités",
+        "de": "Sprache der Funktionsnamen",
+        "es": "Idioma de los nombres de funciones"
+      },
+      "description": {
+        "en": "Names given to the features when a purifier is added to Gladys, and texts of the integration.",
+        "fr": "Noms donnés aux fonctionnalités quand un purificateur est ajouté à Gladys, et textes de l'intégration.",
+        "de": "Namen der Funktionen, wenn ein Luftreiniger zu Gladys hinzugefügt wird, und Texte der Integration.",
+        "es": "Nombres de las funciones cuando se añade un purificador a Gladys, y textos de la integración."
+      },
       "required": false,
-      "default": "celsius",
+      "default": "fr",
       "options": [
-        { "value": "celsius", "label": { "en": "Celsius", "fr": "Celsius" } },
-        { "value": "fahrenheit", "label": { "en": "Fahrenheit", "fr": "Fahrenheit" } }
-      ]
-    },
-    {
-      "key": "poll_frequency",
-      "type": "number",
-      "label": { "en": "Refresh interval (s)", "fr": "Intervalle de rafraîchissement (s)" },
-      "description": {
-        "en": "How often sensors are polled, in seconds (one minute minimum).",
-        "fr": "Fréquence d'interrogation des capteurs, en secondes (une minute minimum)."
-      },
-      "required": false,
-      "default": 300,
-      "min": 60,
-      "max": 3600
-    }
-  ],
-  "actions": [
-    {
-      "key": "test_weather",
-      "label": { "en": "Test the weather provider", "fr": "Tester le fournisseur météo" },
-      "timeout_seconds": 30
-    },
-    {
-      "key": "identify",
-      "label": { "en": "Identify a device", "fr": "Identifier un appareil" },
-      "fields": [
         {
-          "key": "device",
-          "type": "select",
-          "source": "devices",
-          "label": { "en": "Device", "fr": "Appareil" },
-          "required": true
-        }
-      ]
-    }
-  ],
-  "scene_triggers": [
-    {
-      "key": "motion_detected",
-      "label": { "en": "Motion detected", "fr": "Mouvement détecté" },
-      "description": {
-        "en": "A demo motion sensor saw a person or an animal move.",
-        "fr": "Un détecteur de démonstration a vu bouger une personne ou un animal."
-      },
-      "fields": [
-        {
-          "key": "device",
-          "type": "select",
-          "source": "devices",
-          "label": { "en": "Sensor", "fr": "Détecteur" }
+          "value": "en",
+          "label": { "en": "English", "fr": "Anglais", "de": "Englisch", "es": "Inglés" }
         },
         {
-          "key": "target",
-          "type": "multi_select",
-          "label": { "en": "What moved", "fr": "Ce qui a bougé" },
-          "options": [
-            { "value": "person", "label": { "en": "Person", "fr": "Personne" } },
-            { "value": "animal", "label": { "en": "Animal", "fr": "Animal" } }
-          ]
-        }
-      ],
-      "variables": [
+          "value": "fr",
+          "label": { "en": "French", "fr": "Français", "de": "Französisch", "es": "Francés" }
+        },
         {
-          "key": "target",
-          "type": "string",
-          "label": { "en": "What moved", "fr": "Ce qui a bougé" }
-        }
-      ]
-    }
-  ],
-  "scene_actions": [
-    {
-      "key": "identify_device",
-      "label": { "en": "Identify a device", "fr": "Identifier un appareil" },
-      "description": {
-        "en": "Make a device signal itself (the demo light blinks).",
-        "fr": "Fait se signaler un appareil (la lampe de démonstration clignote)."
-      },
-      "timeout_seconds": 15,
-      "fields": [
+          "value": "de",
+          "label": { "en": "German", "fr": "Allemand", "de": "Deutsch", "es": "Alemán" }
+        },
         {
-          "key": "device",
-          "type": "select",
-          "source": "devices",
-          "label": { "en": "Device", "fr": "Appareil" },
-          "required": true
-        }
-      ],
-      "outputs": [
-        {
-          "key": "signalled",
-          "type": "boolean",
-          "label": { "en": "Device signalled", "fr": "Appareil signalé" }
+          "value": "es",
+          "label": { "en": "Spanish", "fr": "Espagnol", "de": "Spanisch", "es": "Español" }
         }
       ]
     }
   ],
   "widgets": [
     {
-      "key": "demo_status",
-      "label": { "en": "Demo status", "fr": "État de la démo" },
-      "description": {
-        "en": "Live temperature and plug power, plug connection and observed location.",
-        "fr": "Température et puissance en direct, connexion de la prise, position observée."
+      "key": "purifier",
+      "label": {
+        "en": "Winix purifier",
+        "fr": "Purificateur Winix",
+        "de": "Winix-Luftreiniger",
+        "es": "Purificador Winix"
       },
-      "icon": "activity",
-      "action_timeout_seconds": 15
+      "description": {
+        "en": "Air quality, PM2.5 and filter of one purifier, with Auto, Manual, Sleep and Off buttons.",
+        "fr": "Qualité de l'air, PM2.5 et filtre d'un purificateur, avec boutons Auto, Manuel, Sommeil, Arrêt.",
+        "de": "Luftqualität, PM2.5 und Filter eines Luftreinigers, mit Tasten Auto, Manuell, Schlaf, Aus.",
+        "es": "Calidad del aire, PM2.5 y filtro de un purificador, con botones Auto, Manual, Sueño y Apagar."
+      },
+      "icon": "wind",
+      "settings": [
+        {
+          "key": "device",
+          "type": "select",
+          "source": "devices",
+          "label": {
+            "en": "Purifier",
+            "fr": "Purificateur",
+            "de": "Luftreiniger",
+            "es": "Purificador"
+          },
+          "required": true
+        }
+      ],
+      "action_timeout_seconds": 20
     }
   ]
 }

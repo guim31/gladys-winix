@@ -5,11 +5,14 @@ contributors.
 
 ## What this is
 
-A Gladys Assistant **external integration**: a Node.js service (Node 22+, ESM,
-no build step) that runs in its own sandboxed Docker container and talks to
+A Gladys Assistant **external integration** for **Winix connected air
+purifiers**, through the Winix cloud: a Node.js service (Node 22+, ESM, no
+build step) that runs in its own sandboxed Docker container and talks to
 Gladys through
 [`@gladysassistant/integration-sdk`](https://github.com/GladysAssistant/integration-sdk-js),
-its only runtime dependency. It started from the official JavaScript template.
+its only runtime dependency (Cognito SRP, AES and HTTP are written on
+`node:crypto`, `node:zlib` and `fetch`). It started from the official
+JavaScript template.
 
 ## Commands
 
@@ -17,11 +20,12 @@ its only runtime dependency. It started from the official JavaScript template.
 npm install
 npm test                                  # node --test, the built-in runner
 node --test test/devices.test.js          # one file
-node --test --test-name-pattern "plug"    # tests whose name matches
+node --test --test-name-pattern "widget"  # tests whose name matches
 npm run lint                              # ESLint
 npm run format:check                      # Prettier, as the CI runs it
 npm run format                            # Prettier, fix in place
 npx github:GladysAssistant/integration-store .   # store admission checks
+node scripts/probe.mjs                    # real Winix cloud, fake account (needs Internet)
 ```
 
 The CI (`.github/workflows/ci.yml`) runs `format:check`, `lint` and `test` on
@@ -31,16 +35,25 @@ pushing.
 ## Architecture
 
 ```
-index.js                          SDK wiring only: handlers registered before connect()
-src/devices/index.js              registry of the device blueprints + dispatch helpers
-src/devices/<type>.js             one device type per file (buildDevice, onPoll, onSetValue...)
-src/scenes.js                     scene action handlers (manifest `scene_actions`)
-src/widgets.js                    dashboard widget handlers (manifest `widgets`)
+index.js                          SDK wiring only: createApp({ gladys }).register(), then connect()
+src/app.js                        lifecycle, discovery, reads, commands, widget (everything injected)
+src/devices.js                    one Gladys device per purifier: features, states from attributes
+src/poller.js                     the container's own refresh timer (Gladys#3198), onPoll fallback
+src/issues.js                     a repeated failure logged once, and its recovery
+src/i18n.js                       every text, feature name and label in en/fr/de/es
 src/config.js                     DEFAULT_CONFIG (mirrors the manifest defaults) + normalization
-src/weather.js                    example driver (Open-Meteo)
-gladys-assistant-integration.json manifest: name, config_schema, actions, image...
-docs/en.md, docs/fr.md            user documentation, re-hosted by Gladys (mandatory)
-test/                             node --test, against the SDK's fake Gladys (integration-sdk/testing)
+src/store.js                      /data/winix-session.json (refresh token, identity, devices)
+src/winix/srp.js                  Cognito SRP client (pure, BigInt)
+src/winix/cognito.js              sign-in, refresh, identity id (plain JSON calls, no AWS SDK)
+src/winix/mobile.js               AES mobile API: session handshake, device list, filter life
+src/winix/device-api.js           state and control of a purifier, rate-limit cooldown
+src/winix/purifier.js             attribute codes <-> values, command plans (no I/O)
+src/winix/account.js              session lifecycle: when to sign in, refresh, keep /data
+src/winix/errors.js               one error class per reaction
+scripts/probe.mjs                 read-only probe of the real cloud with a fake account
+gladys-assistant-integration.json manifest: name, config_schema, widget, image...
+docs/{en,fr,de,es}.md             user documentation, same sections (re-hosted by Gladys)
+test/                             node --test, SDK fake Gladys + test/helpers/fakeWinix.js
 .github/scripts/release.mjs       release helpers (manifest bump, changelog), tested in test/
 ```
 
@@ -70,8 +83,10 @@ test/                             node --test, against the SDK's fake Gladys (in
   `type: "provider"`: 5.1.0). `test/manifest.test.js` ties the manifest to the
   code (defaults, action, scene and widget handlers): change both sides
   together.
-- **User-facing text** is bilingual (English and French): action messages,
-  manifest texts, and `docs/en.md` / `docs/fr.md`, kept in sync.
+- **User-facing text** exists in four languages (English, French, German,
+  Spanish): manifest texts, messages and feature names (`src/i18n.js`), and
+  `docs/en.md`, `docs/fr.md`, `docs/de.md`, `docs/es.md` with the same
+  sections. `test/i18n.test.js` enforces it.
 - **Style.** Prettier formats, ESLint catches mistakes. Comments explain why,
   in English. Tests never touch the network.
 
@@ -233,3 +248,67 @@ long, et sur un « Sie »/« Ihr… » de politesse en allemand. Le store exige 
 - Docs `en`, `fr`, `de`, `es` avec les mêmes sections.
 - Chauffe, ouverture, sécurité : ne rien rendre pilotable « comme un thermostat » ou par un assistant
   vocal quand une erreur serait dangereuse (leçon d'OctoPrint).
+
+## Intégration Winix
+
+**API (cloud Winix, rétro-ingénierie de l'appli Winix Smart 1.5.7)**
+
+- Connexion : AWS Cognito `us-east-1_Ofd50EosD`, client d'appli **public**
+  `5rjk59c5tt7k9g8gpj0vd2qfg9` (Winix l'a changé le 16/04/2026 ; l'ancien
+  `14og512b9u20b8vrdm55d8empi`, avec secret, est mort). Flux `USER_SRP_AUTH`
+  seulement : SRP écrit dans `src/winix/srp.js`, vérifié par un vrai calcul côté
+  serveur dans `test/helpers/fakeWinix.js`. Le 15/10/2026, le vrai Cognito a
+  répondu `UserNotFoundException` à un faux compte (`scripts/probe.mjs`) : le
+  pool n'a pas `PreventUserExistenceErrors`, et le client est bien accepté (un
+  client inconnu répondrait `ResourceNotFoundException`).
+- Identité : `GetId` du pool d'identités `us-east-1:84008e15-…` avec l'id token.
+  L'`identityId` est **stable pour le compte** et entre dans chaque URL de
+  commande : c'est presque une clé, jamais dans les journaux.
+- API mobile `us.mobile.winix-iot.com` : corps chiffrés AES-256-CBC (clé et IV
+  de l'appli), réponse chiffrée **même en erreur**. Poignée de main dans cet
+  ordre : `registerUser`, `init`, `checkAccessToken`, puis `getDeviceInfoList`
+  et `getAllModelGroupInfoList` (durée de vie des filtres par modèle).
+- **Une seule session mobile par compte** : une connexion de Gladys déconnecte
+  l'appli du téléphone et inversement (HTTP 400, `resultCode` 900 « MULTI
+  LOGIN » ou 400). La lecture (`/common/event/sttus/devices/<id>`, sans
+  authentification) et la commande (`/common/control/devices/<id>/<identityId>/<attr>:<valeur>`)
+  n'en ont pas besoin : l'intégration n'ouvre une session que pour lister les
+  purificateurs (premier démarrage, recherche) et garde jeton de
+  rafraîchissement, `identityId` et liste dans `/data`.
+- Codes : `A02` marche, `A03` mode (01 auto, 02 manuel), `A04` flux (01 bas,
+  02 moyen, 03 haut, 05 turbo, 06 sommeil, 08 Super Clean de la Tower Prime),
+  `A07` Plasmawave, `A21` heures de filtre **utilisées**, `S04` PM2.5, `S07`
+  qualité de l'air (01 à 04, ou décimal sur certains firmwares), `S08` « qvalue »
+  (non publiée : sémantique inconnue), `S14` lumière (brute, sans unité), `A05`
+  (non publié, sens incertain). Le sommeil est un **flux** du mode manuel.
+- Limites de débit : pas de quota publié ; une rafale vaut HTTP 403/429 pendant
+  ~1 min → attente de 60 s. Lecture des purificateurs l'un après l'autre.
+- `productGroup` « Air… » = purificateur ; « Deh… » (déshumidificateur) et
+  « Acn… » (climatiseur) sont ignorés.
+
+**Choix de conception**
+
+- Identifiant de plateforme : l'**adresse MAC** (le suffixe du `deviceId` Winix
+  change quand on réappaire le purificateur).
+- Mode en `text/select` (auto, manuel, sommeil), réglable depuis les scènes
+  (5.1.0) ; la vitesse en `fan/speed` 0-4 (0 = sommeil) donne l'historique et
+  les seuils. `fan/mode` du cœur (OFF/LOW/MEDIUM/HIGH/AUTO, liste figée) ne
+  sait pas dire « sommeil ».
+- Qualité de l'air en `risk/integer` 0-3 : le badge du cœur colore vert, jaune,
+  orange, rouge. `airquality-sensor/aqi` aurait tout coloré en vert (échelle
+  IQA 0-500).
+- Les capteurs facultatifs (PM2.5, lumière) suivent les attributs lus : chaque
+  purificateur est lu **avant** la première publication.
+- Pas de déclencheur ni d'action de scène : les états suffisent (seuil
+  « Durée de vie du filtre ≤ 5 % »).
+
+**Pièges découverts**
+
+- Les constantes du SDK ne portent pas toujours le nom de la catégorie du cœur :
+  `DEVICE_FEATURE_TYPES.FILTER_MONITORING.FILTER_LIFE_REMAINING` (catégorie
+  `hepa-filter-monitoring`), et `DEVICE_FEATURE_TYPES.SENSOR.DECIMAL` pour
+  `pm25-sensor` et `light-sensor` (pas de `PM25_SENSOR`/`LIGHT_SENSOR` dans les
+  types). Vérifier chaque constante au lieu de la deviner.
+- `light-sensor/integer` n'a pas d'icône dans le front : `light-sensor/decimal`.
+- Le proxy de la session refuse `us.mobile.winix-iot.com` et
+  `us.api.winix-iot.com` ; Cognito passe.
