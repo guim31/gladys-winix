@@ -1,61 +1,152 @@
-# Demo Devices Template
+# Winix
 
-This is the user documentation of the integration. Gladys re-hosts this file
-and shows a permanent **Documentation** link to it in the Configuration screen
-(in the user's language, with English as the fallback) — it is when
-configuring that the user needs it most. Keep the short onboarding hints in
-the `section` blocks of the manifest `config_schema`; put the long
-step-by-step (screenshots, troubleshooting…) here.
+## Overview
 
-## What you get
+Control your **Winix connected air purifiers** (C545, C610, AM90, T810,
+5500-2 Wi-Fi, Tower…) from Gladys: power, mode, fan speed, Plasmawave, and
+follow the air quality, the PM2.5 particles when the model measures them, the
+ambient light and the wear of the filter.
 
-Six demo devices show up after installation: a weather station (real data
-from Open-Meteo), a switch, a dimmable light, a smart plug with power
-metering, a motion sensor and a camera.
+The integration goes through the **Winix cloud**, the one of the Winix Smart
+app: it needs an Internet connection and a Winix account.
+
+> Developed **without the hardware**: the exchanges with the Winix cloud
+> follow the open-source projects that described them and their real
+> answers, but the integration has not been tried on a real purifier yet.
+> Feedback is welcome, on the Gladys forum or in the issues of the GitHub
+> repository.
+>
+> This integration is **not affiliated with Winix**: it is a community
+> project, neither endorsed nor supported by Winix.
+
+## Requirements
+
+- Gladys **5.1.0** or later.
+- A Winix Wi-Fi purifier already set up in the **Winix Smart** app (the app
+  connects it to the Wi-Fi; the integration does not).
+- The e-mail address and password you sign in to the Winix Smart app with.
+- Winix dehumidifiers and air conditioners are not supported: they are
+  ignored.
 
 ## Configuration
 
-1. Open the **Configuration** tab of the integration.
-2. Set the **latitude** and **longitude** the demo weather station should
-   observe (they default to Paris), and pick your temperature unit.
-   The **refresh interval** sets how often the weather station and the
-   plug's power are read: every 5 minutes by default, every minute at most.
-3. Save: the devices appear in the **Discovery** tab, ready to be added.
+1. Install the integration: **Integrations → Install from GitHub**, or from
+   the catalog.
+2. In the **Configuration** tab, enter the **e-mail address** and the
+   **password** of the Winix account.
+3. Pick the **refresh interval** (2 minutes by default, 1 to 5) and the
+   **language of the feature names** (French by default).
+4. Save: the connection status shows at the top of the page. Your purifiers
+   appear in the **Discovery** tab; add them.
 
-The **Prefer the local connection** toggle drives the demo plug: it reports
-the channel it actually uses as a badge (local or cloud), with an orange dot
-when it runs degraded (local refused, cloud fallback).
+**Important — the phone app.** Winix accepts one mobile session per
+account. The first sign-in of Gladys may log the Winix app of your phone out:
+simply sign in again in the app. The integration opens a session only to list
+your purifiers (first start, new scan in **Discovery**); reading and commands
+do not need one, so it keeps working when the phone takes the session back.
 
-## Actions
+## The devices
 
-- **Test the weather provider** — performs a live request to Open-Meteo and
-  shows the current temperature and humidity under the button.
-- **Identify a device** — pick one of your devices in the list and it will
-  signal itself (the demo light "blinks" in the logs).
+One device per purifier, named as in the Winix app:
 
-## Scenes
+| Feature           | Type                       | What it does                                                           |
+| ----------------- | -------------------------- | ---------------------------------------------------------------------- |
+| Power             | switch, controllable       | turns the purifier on or off                                           |
+| Mode              | list, controllable         | Auto, Manual or Sleep                                                  |
+| Fan speed         | level 0 to 4, controllable | 0 sleep, 1 low, 2 medium, 3 high, 4 turbo (5 Super Clean: Tower Prime) |
+| Plasmawave        | switch, controllable       | turns Plasmawave on or off                                             |
+| Air pollution     | risk level 0 to 3          | the Winix color ring: 0 good, 1 fair, 2 poor, 3 very poor              |
+| PM2.5             | µg/m³                      | only on the models with that sensor                                    |
+| Ambient light     | raw value                  | the reading of the light sensor (no unit, Winix gives none)            |
+| Filter life       | %                          | what is left of the filter, 0 % when it is due                         |
+| Filter hours left | hours                      | hours of use left before the change                                    |
+| Online            | yes / no                   | the Winix cloud has news from the purifier                             |
 
-The integration adds its own cards to the scene editor (Gladys 5.1 or
-later), under the **Integrations** category:
+- Choosing a speed switches the purifier to manual mode, as in the app. In
+  Auto mode, the speed shown is the one the purifier chose.
+- Choosing a mode or a speed turns the purifier on if it was off.
+- The filter life comes from the hour counter of the purifier and the life
+  planned for the model (6,480 h, 9 months, for most). It should start again
+  from 100 % when the filter counter is reset on the purifier after a change
+  (to be confirmed on real hardware).
+- The sensors (PM2.5, light) are detected at the first reading. If a sensor
+  shows up later, the Discovery tab offers **Update**.
 
-- **Motion detected** (trigger) — starts the scene when a demo motion sensor
-  sees something move. Optionally pick the sensor and what moved (person,
-  animal); left empty, any detection matches. The following actions can
-  read what moved with `{{triggerEvent.data.target}}`.
-- **Identify a device** (action) — makes the chosen device signal itself.
-  It returns whether the device could signal itself, so the following
-  actions can depend on it.
+## Widget
 
-## Dashboard
+The **Winix purifier** dashboard widget shows a purifier chosen in its
+settings: live PM2.5 and filter, mode, air quality and filter hours, and four
+buttons **Auto**, **Manual**, **Sleep** and **Turn off** (a **Turn on**
+button when it is off). The current mode carries a check mark.
 
-Add the **Demo status** widget to a dashboard: it shows the live
-temperature of the weather station and the power of the office plug, the
-connection the plug currently uses (orange when degraded) and the observed
-location. Its **Identify the light** button makes the demo light signal
-itself.
+## Scene triggers and actions
+
+The integration adds no scene trigger or action: everything goes through the
+features of the device, which Gladys scenes already read and control. A
+"filter to replace" is the threshold **Filter life ≤ 5 %** of a scene,
+triggered once when it is crossed; a separate trigger would repeat it.
+
+## Scene examples
+
+- **Quiet night**: at 10:30 pm, set the **Mode** of the bedroom purifier to
+  **Sleep**; at 7 am, back to **Auto**.
+- **Polluted air**: when the **Air pollution** of the living room reaches 2
+  or more (or **PM2.5** above 25 µg/m³), set the **Fan speed** to 4 and send
+  a message; back to **Auto** when it drops to 0.
+- **Filter**: when the **Filter life** drops below 5 %, send "Order a filter
+  for the purifier".
+- **Empty house**: when everybody left, turn the purifiers off; back on in
+  **Auto** when the first one comes home.
+
+## Refresh and conditions of the Winix cloud
+
+- Each purifier added to Gladys is read every **2 minutes** by default (1 to
+  5 depending on the configuration), one after the other. Only the values
+  that change are sent to Gladys, with a reminder every 6 h for those that do
+  not move.
+- Winix publishes no API and no quota. The cloud refuses a burst of requests
+  for about a minute: the integration then waits a minute before going on.
+  Avoid the one-minute interval if you have many purifiers.
+- After a command, the purifier is read again 5 seconds later to show what it
+  really did.
+- The account is only used at the first start and at each scan in
+  **Discovery**; the session (refresh token, identity) and the list of the
+  purifiers are kept in `/data`.
+
+## Data and privacy
+
+- The password stays in the configuration of Gladys; it is only sent to the
+  Winix sign-in service (AWS Cognito), and never in clear: the sign-in uses
+  the SRP protocol.
+- `/data/winix-session.json` keeps the refresh token, the identity of the
+  account and the list of the purifiers, readable by the container only.
+- No token, password or identity ever shows in the logs.
 
 ## Troubleshooting
 
-The integration logs everything it does: check the integration logs from the
-Gladys UI (or `docker logs` on the host) with `LOG_LEVEL=debug` for the full
-detail.
+- **"Winix refused the e-mail address or the password"**: check them by
+  signing in to the Winix app, then save them again. The integration does not
+  retry the same credentials on its own, so as not to lock the account.
+- **The phone app logs me out**: that is the single session of Winix (see
+  Configuration). Sign in again in the app; Gladys keeps reading and
+  controlling the purifiers.
+- **"The Winix cloud does not answer"**: an Internet or Winix outage. The
+  integration retries at each cycle and says it once in the logs.
+- **A purifier is "offline"**: it is unplugged or lost its Wi-Fi. Check it in
+  the Winix app.
+- **A new purifier does not show**: run a scan in the **Discovery** tab.
+- **More details**: set `LOG_LEVEL=debug` in the logs of the integration.
+
+## Limits
+
+- Depends on the Winix cloud and on Internet: no local control.
+- Not tried on real hardware yet; the codes and answers come from the
+  open-source projects credited in the README.
+- One mobile session per Winix account (see Configuration).
+- Air purifiers only: no Winix dehumidifier nor air conditioner.
+- No child lock, display brightness or timer: the commands are power, mode,
+  speed and Plasmawave.
+- The air quality is the Winix indicator with 3 or 4 levels, not an AQI; the
+  ambient light is a raw value.
+- Feature names are set when the device is added: changing the language
+  afterwards does not rename them.
