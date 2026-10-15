@@ -10,6 +10,8 @@ the notes of the version's GitHub Release.
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-10-15
+
 ### Added
 
 - Winix connected air purifiers in Gladys, through the Winix cloud: one
@@ -29,4 +31,5 @@ the notes of the version's GitHub Release.
 - Every text in English, French, German and Spanish, and the user guide in
   the four languages.
 
-[Unreleased]: https://github.com/guim31/gladys-winix/commits/main
+[Unreleased]: https://github.com/guim31/gladys-winix/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/guim31/gladys-winix/releases/tag/v1.0.1
